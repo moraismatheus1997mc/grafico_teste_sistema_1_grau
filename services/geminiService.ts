@@ -1,15 +1,5 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Scenario } from '../types';
-
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  // This is a fallback for development, but the environment must provide the key.
-  console.warn("API_KEY environment variable not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const prompt = `
 Você é um game designer educacional criando problemas de matemática para um adolescente surfista. Sua tarefa é gerar um problema que envolve um sistema de duas equações lineares na forma y = ax + b.
@@ -56,7 +46,22 @@ const schema = {
   },
 };
 
+const fallbackScenario: Scenario = {
+  story: "A API falhou em gerar um novo desafio (ou a API Key não foi configurada), mas não se preocupe! Use este cenário reserva: A previsão indica que as ondas seguem a relação onde o pico (y) é 1.2 vezes a maré (x) mais 0.5 metros. Sua prancha nova, no entanto, funciona melhor quando o pico (y) é o dobro da maré (x) menos 1 metro. Qual o ponto ideal?",
+  eq1: { a: 1.2, b: 0.5 },
+  eq2: { a: 2, b: -1 },
+};
+
 export const generateSurfScenario = async (): Promise<Scenario> => {
+  const API_KEY = process.env.API_KEY;
+
+  if (!API_KEY) {
+    console.warn("API_KEY environment variable not set. Returning fallback scenario.");
+    return fallbackScenario;
+  }
+
+  const ai = new GoogleGenAI({ apiKey: API_KEY });
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
@@ -71,7 +76,6 @@ export const generateSurfScenario = async (): Promise<Scenario> => {
     const jsonText = response.text.trim();
     const parsedScenario = JSON.parse(jsonText) as Scenario;
 
-    // Basic validation
     if (!parsedScenario.story || !parsedScenario.eq1 || !parsedScenario.eq2) {
       throw new Error("Invalid scenario structure received from API.");
     }
@@ -79,11 +83,6 @@ export const generateSurfScenario = async (): Promise<Scenario> => {
     return parsedScenario;
   } catch (error) {
     console.error("Error generating scenario with Gemini:", error);
-    // Fallback to a default scenario in case of API error
-    return {
-      story: "A API falhou em gerar um novo desafio, mas não se preocupe! Use este cenário reserva: A previsão indica que as ondas seguem a relação onde o pico (y) é 1.2 vezes a maré (x) mais 0.5 metros. Sua prancha nova, no entanto, funciona melhor quando o pico (y) é o dobro da maré (x) menos 1 metro. Qual o ponto ideal?",
-      eq1: { a: 1.2, b: 0.5 },
-      eq2: { a: 2, b: -1 },
-    };
+    return fallbackScenario;
   }
 };
